@@ -1,4 +1,4 @@
-package uz.shuhratdev
+package uz.shuhratdev.audiotransrec
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -24,6 +24,7 @@ class AudioStreamService : Service() {
     private var clientSocket: Socket? = null
     private var audioTrack: AudioTrack? = null
     private var isRunning = false
+    private val PORT = 12345
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -50,15 +51,19 @@ class AudioStreamService : Service() {
 
         try {
             audioTrack = AudioTrack.Builder()
-                .setAudioAttributes(AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_GAME) // Minimal lag uchun
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build())
-                .setAudioFormat(AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
-                    .build())
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                        .build()
+                )
                 .setBufferSizeInBytes(bufferSize)
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build()
@@ -69,22 +74,19 @@ class AudioStreamService : Service() {
             Log.e(TAG, "AudioTrack yaratishda xatolik: ${e.message}")
         }
 
-        // Tarmoq oqimini alohida Thread ichida boshlaymiz
         thread(start = true, isDaemon = true) {
             try {
-                val port = 12344
-                // ADB tunnel uchun aynan localhost interfeysini tinglaymiz
                 val localAddress = InetAddress.getByName("127.0.0.1")
-                serverSocket = ServerSocket(port, 1, localAddress)
+                serverSocket = ServerSocket(PORT, 1, localAddress)
 
-                Log.d(TAG, "[*] Server 127.0.0.1:$port portida ulanishni kutyapti...")
+                Log.d(TAG, "[*] Server 127.0.0.1:$PORT portida ulanishni kutyapti...")
 
                 while (isRunning) {
                     clientSocket = serverSocket?.accept()
                     Log.d(TAG, "[+] Kompyuter muvaffaqiyatli ulandi: ${clientSocket?.remoteSocketAddress}")
 
                     val inputStream = clientSocket?.getInputStream()
-                    val buffer = ByteArray(512) // Kichik bufer = minimal lag
+                    val buffer = ByteArray(512)
 
                     while (isRunning) {
                         val bytesRead = inputStream?.read(buffer) ?: -1
@@ -92,7 +94,6 @@ class AudioStreamService : Service() {
                             Log.d(TAG, "[-] Kompyuter ulanishni uzdi.")
                             break
                         }
-                        // Ovozni naushnikka (Earpods) chiqarish
                         audioTrack?.write(buffer, 0, bytesRead)
                     }
                 }
@@ -116,7 +117,7 @@ class AudioStreamService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("PC Audio Sink")
             .setContentText("Kompyuterdan ovoz qabul qilinmoqda...")
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(android.R.drawable.ic_media_play) // Muammo shu yerda to'g'rilandi
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 

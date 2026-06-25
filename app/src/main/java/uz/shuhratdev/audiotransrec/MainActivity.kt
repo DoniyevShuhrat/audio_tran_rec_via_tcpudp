@@ -1,57 +1,66 @@
 package uz.shuhratdev.audiotransrec
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Button
+import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import uz.shuhratdev.AudioStreamService
-import uz.shuhratdev.audiotransrec.ui.theme.AudioTransRecTheme
-import kotlin.jvm.java
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var button: Button
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-//        enableEdgeToEdge()
-        // Oddiy layout o'rniga dinamik tugma yaratamiz
-        val button = Button(this).apply {
+
+        button = Button(this).apply {
             text = "Audio Oqimni Boshlash"
         }
-        setContentView(button);
+        setContentView(button)
 
         button.setOnClickListener {
-            val intent = Intent(this, AudioStreamService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-            button.text = "Oqim Faol (Fonda ishlamoqda)"
-            button.isEnabled = false
+            checkPermissionAndStartService()
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+    private fun checkPermissionAndStartService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    AudioTransRecTheme {
-        Greeting("Android")
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    101
+                )
+                return
+            }
+        }
+        startAudioService()
+    }
+
+    private fun startAudioService() {
+        val intent = Intent(this, AudioStreamService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        button.text = "Oqim Faol (Fonda ishlamoqda)"
+        button.isEnabled = false
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 101 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startAudioService()
+        } else {
+            Toast.makeText(this, "Bildirishnoma ruxsati berilmadi! Servis ishlamasligi mumkin.", Toast.LENGTH_LONG).show()
+        }
     }
 }
